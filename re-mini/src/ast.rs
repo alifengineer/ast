@@ -57,7 +57,7 @@ impl Condition {
                     CmpOp::Lt => Ok(l.lt(&r)),
                 }
             }
-            Condition::And(a, b) => Ok(a.evaluate(ctx)? && a.evaluate(ctx)?),
+            Condition::And(a, b) => Ok(a.evaluate(ctx)? && b.evaluate(ctx)?),
             Condition::Or(a, b) => Ok(a.evaluate(ctx)? || b.evaluate(ctx)?),
         }
     }
