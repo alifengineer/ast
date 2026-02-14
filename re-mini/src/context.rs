@@ -7,15 +7,21 @@ pub struct DataContext {
 }
 
 impl DataContext {
-    fn add(&mut self, name: String, value: Value){
+    pub fn new() -> DataContext {
+        Self {
+            facts: HashMap::new()
+        }
+    }
+
+    pub fn add(&mut self, name: String, value: Value){
         self.facts.insert(name, value);
     }
 
-    fn get(&self, name: String) -> Option<&Value> {
+    pub fn get(&self, name: String) -> Option<&Value> {
         self.facts.get(&name) // we borrow here
     }
 
-    fn set(&mut self, name: String, value: Value) {
+    pub fn set(&mut self, name: String, value: Value) {
         self.facts.insert(name, value);
     }
 }
