@@ -1,7 +1,6 @@
-use std::fmt::{format, Error};
+use crate::{ast::{Action, CmpOp, Condition, Expr, Op, Rule}, value::Value};
 
-use crate::value::Value;
-
+#[derive(Debug)]
 enum Token {
     Int(i64),
     Bool(bool),
@@ -239,6 +238,204 @@ struct Parser {
     pos: usize,
 }
 
+impl Parser {
+    fn peek(&self) -> Option<&Token> {
+        let token = self.tokens.get(self.pos);
+        token
+    }
+
+    fn advance(&mut self) -> Option<&Token> {
+        let token = self.tokens.get(self.pos);
+        self.pos+=1;
+        token
+    }
+
+    fn parse_rule(&mut self) -> Result<Rule, String> {
+        if !matches!(self.peek(), Some(Token::Rule)) {
+            return Err("expected 'rule'".into());
+        }
+        self.advance();
+
+        let name = if let Some(Token::Ident(s)) = self.advance() {
+            s.clone()
+        } else {return Err("expected rule name".into());};
+
+        if matches!(self.peek(), Some(Token::StringLit(_))) {
+            self.advance();
+        }
+
+        if !matches!(self.peek(), Some(Token::LBrace)) {
+            return Err("expected {".into());
+        }
+        self.advance();
+
+        if !matches!(self.peek(), Some(Token::When)) {
+            return Err("expected 'when'".into());
+        }
+        self.advance();
+        
+        let condition = self.parse_condition()?;
+
+        if !matches!(self.peek(), Some(Token::Then)) {
+            return Err("expected 'then'".into());
+        }
+        self.advance();
+
+        let actions = self.parse_actions()?;
+
+        if !matches!(self.peek(), Some(Token::RBrace)) {
+            return Err("expected '}'".into());
+        }
+        self.advance();
+
+        Ok(Rule {name, condition, actions})
+    }
+
+    fn parse_condition(&mut self) -> Result<Condition, String> {
+        let mut left = self.parse_comparison()?;
+        loop {
+            match self.peek() {
+                Some(Token::And) => {
+                    self.advance();
+                    let right = self.parse_comparison()?;
+                    left = Condition::And(Box::new(left), Box::new(right));
+                }
+                Some(Token::Or) => {
+                    self.advance();
+                    let right = self.parse_comparison()?;
+                    left = Condition::Or(Box::new(left), Box::new(right));
+                }
+                _ => break,
+            }
+        }
+        Ok(left)
+    }
+
+    fn parse_expr(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_atom()?;
+        loop {
+            match self.peek() {
+                Some(Token::Plus) => {
+                    self.advance();
+                    let right = self.parse_atom()?;
+                    left = Expr::BinOp {
+                        left: Box::new(left),
+                        op: Op::Add,
+                        right: Box::new(right),
+                    };
+                }
+                _ => break,
+            }
+        }
+        Ok(left)
+    }
+
+    fn parse_actions(&mut self) -> Result<Vec<Action>, String> {
+        let mut actions = Vec::new();
+        while !matches!(self.peek(), Some(Token::RBrace) | None) {
+            let name = if let Some(Token::Ident(s)) = self.advance() {
+                s.clone()
+            } else {
+                return Err("expected identifier".into());
+            };
+
+            if !matches!(self.peek(), Some(Token::Dot)) {
+                return  Err("expected '.'".into());
+            }
+            self.advance();
+
+            let field_name = if let Some(Token::Ident(s)) = self.advance() {
+                format!("{}.{}", name, s)
+            } else {
+                return Err("expected field name".into());
+            };
+
+            if !matches!(self.peek(), Some(Token::Assign)) {
+                return Err("expected '='".into());
+            }
+            self.advance();
+
+            let expr = self.parse_expr()?;
+            
+
+            if !matches!(self.peek(), Some(Token::Semicolon)) {
+                return Err("expected ';'".into());
+            }
+            self.advance();
+
+            actions.push(Action::Assign { field: field_name, expr: expr });
+        }
+        Ok(actions)
+    }
+
+    fn parse_comparison(&mut self) -> Result<Condition, String> {
+        let left = self.parse_expr()?;
+        let cmp_op = match self.peek() {
+            Some(Token::Eq) => CmpOp::Eq,
+            Some(Token::Lt) => CmpOp::Lt,
+            Some(Token::Gt) => CmpOp::Gt,
+            other => return Err(format!("unexpected operator {:?}", other)),
+        };
+        self.advance();
+        let right = self.parse_expr()?;
+        
+        Ok(Condition::Compare {left, op:cmp_op, right})
+    }
+
+    fn parse_atom(&mut self) -> Result<Expr, String> {
+        match self.peek() {
+            Some(Token::Int(_)) => {
+                if let Some(Token::Int(n)) = self.advance() {
+                    let n = *n;
+                    Ok(Expr::Literal(Value::Int(n)))
+                } else {
+                    unreachable!()
+                }
+            },
+            Some(Token::Ident(_)) => {
+                let name = if let Some(Token::Ident(s)) = self.advance() {
+                    s.clone()
+                } else {
+                    unreachable!()
+                };
+
+                if matches!(self.peek(), Some(Token::Dot)) {
+                    self.advance();
+                    if let Some(Token::Ident(field)) = self.advance() {
+                        Ok(Expr::FieldRef(format!("{}.{}", name, field)))
+                    } else {
+                        Err("expected field name after '.'".into())
+                    }
+                } else {
+                    Ok(Expr::FieldRef(name))
+                }
+            },
+            Some(Token::LParen) => {
+                self.advance();
+                let expr = self.parse_expr()?;
+                if !matches!(self.peek(), Some(Token::RParen)) {
+                    return Err("expected ')'".to_string())
+                }
+                self.advance();
+                Ok(expr)
+            }
+            other => Err(format!("unexpected token in atom {:?}", other)),
+        }
+    } 
+}
+
+fn parse(input: String) -> Result<Vec<Rule>, String> {
+    let tokens = tokenize(input.to_string())?;
+    let mut parser = Parser{tokens, pos: 0};
+    let mut rules = vec![];
+    while parser.pos < parser.tokens.len() {
+        rules.push(parser.parse_rule()?);
+    }
+
+    Ok(rules)
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,5 +444,22 @@ mod tests {
     fn test_tokenize_simple() {
         let tokens = tokenize("Vibo.A == 0".to_string()).unwrap();
         assert_eq!(tokens.len(), 5);
+    }
+
+    #[test]
+    fn test_parse_fib_rule() {
+        let input = r#"
+    rule CalcFib "Calculate Fibonacci" {
+        when
+            Vibo.A == 0 || Vibo.B == 0
+        then
+            Vibo.A = 1;
+            Vibo.B = 1;
+    }
+    "#;
+
+        let rules = parse(input.to_string()).unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].name, "CalcFib")
     }
 }

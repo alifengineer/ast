@@ -1,6 +1,6 @@
 use crate::{context::DataContext, value::Value};
 
-enum Expr {
+pub enum Expr {
     Literal(Value),
     FieldRef(String),
     BinOp {
@@ -10,7 +10,7 @@ enum Expr {
     },
 }
 
-enum Op {
+pub enum Op {
     Add,
 }
 
@@ -33,13 +33,13 @@ impl Expr {
     }
 }
 
-enum CmpOp {
+pub enum CmpOp {
     Eq,
     Lt,
     Gt,
 }
 
-enum Condition {
+pub enum Condition {
     Compare { left: Expr, op: CmpOp, right: Expr },
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
@@ -63,7 +63,7 @@ impl Condition {
     }
 }
 
-enum Action {
+pub enum Action {
     Assign { field: String, expr: Expr },
 }
 
@@ -81,9 +81,9 @@ impl Action {
 }
 
 pub struct Rule {
-    name: String,
-    condition: Condition,
-    actions: Vec<Action>,
+    pub name: String,
+    pub condition: Condition,
+    pub actions: Vec<Action>,
 }
 
 impl Rule {
