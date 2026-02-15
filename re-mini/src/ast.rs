@@ -49,8 +49,8 @@ impl Condition {
     pub fn evaluate(&self, ctx: &DataContext) -> Result<bool, String> {
         match self {
             Condition::Compare { left, op, right } => {
-                let l = left.evaluate(ctx);
-                let r = right.evaluate(ctx);
+                let l = left.evaluate(ctx)?;
+                let r = right.evaluate(ctx)?;
                 match op {
                     CmpOp::Eq => Ok(l.eq(&r)),
                     CmpOp::Gt => Ok(l.gt(&r)),
