@@ -438,6 +438,8 @@ fn parse(input: String) -> Result<Vec<Rule>, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::context::DataContext;
+
     use super::*;
 
     #[test]
@@ -460,6 +462,20 @@ mod tests {
 
         let rules = parse(input.to_string()).unwrap();
         assert_eq!(rules.len(), 1);
-        assert_eq!(rules[0].name, "CalcFib")
+        assert_eq!(rules[0].name, "CalcFib");
+
+        let mut ctx = DataContext::new();
+        ctx.set("Vibo.A".into(), Value::Int(0));
+        ctx.set("Vibo.B".into(), Value::Int(1));
+
+        for rule in rules {
+            let run = rule.evaluate(&ctx).unwrap();
+            assert_eq!(run, true);
+
+            assert_eq!(rule.execute(&mut ctx).unwrap(), ());
+           
+            assert_eq!(ctx.get("Vibo.A".into()).unwrap().clone(), Value::Int(1));
+            assert_eq!(ctx.get("Vibo.B".into()).unwrap().clone(), Value::Int(1));
+        }
     }
 }

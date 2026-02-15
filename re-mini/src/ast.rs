@@ -15,7 +15,7 @@ pub enum Op {
 }
 
 impl Expr {
-    fn evaluate(&self, ctx: &DataContext) -> Result<Value, String> {
+    pub fn evaluate(&self, ctx: &DataContext) -> Result<Value, String> {
         match self {
             Expr::Literal(v) => Ok(v.clone()),
             Expr::FieldRef(name) => ctx
@@ -46,7 +46,7 @@ pub enum Condition {
 }
 
 impl Condition {
-    fn evaluate(&self, ctx: &DataContext) -> Result<bool, String> {
+    pub fn evaluate(&self, ctx: &DataContext) -> Result<bool, String> {
         match self {
             Condition::Compare { left, op, right } => {
                 let l = left.evaluate(ctx);
@@ -68,7 +68,7 @@ pub enum Action {
 }
 
 impl Action {
-    fn execute(&self, ctx: &mut DataContext) -> Result<(), String> {
+    pub fn execute(&self, ctx: &mut DataContext) -> Result<(), String> {
         match self {
             Action::Assign { field, expr } => {
                 let val = expr.evaluate(ctx)?;
@@ -87,11 +87,11 @@ pub struct Rule {
 }
 
 impl Rule {
-    fn evaluate(&self, ctx: &DataContext) -> Result<bool, String> {
+    pub fn evaluate(&self, ctx: &DataContext) -> Result<bool, String> {
         self.condition.evaluate(ctx)
     }
 
-    fn execute(&self, ctx: &mut DataContext) -> Result<(), String> {
+    pub fn execute(&self, ctx: &mut DataContext) -> Result<(), String> {
         for action in &self.actions {
             action.execute(ctx)?;
         }
